@@ -2,7 +2,7 @@ use std::{
     path::{Path, PathBuf},
     str::Utf8Error,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::model::protofetch::{DependencyName, Descriptor, Revision};
 use git2::{Repository, ResetType};

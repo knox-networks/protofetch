@@ -8,7 +8,7 @@ use crate::model::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path, str::FromStr};
 use toml::Value;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]

@@ -1,7 +1,7 @@
 use derive_new::new;
 use git2::Config;
 use std::{env, error::Error};
-use tracing::{debug, error, info, warn};
+use tracing::{warn};
 
 pub mod args;
 pub mod command_handlers;
