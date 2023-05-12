@@ -1,4 +1,4 @@
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::{
     cache::ProtofetchGitCache,
@@ -16,6 +16,7 @@ use std::{
 };
 
 /// Handler to fetch command
+#[instrument]
 pub fn do_fetch(
     force_lock: bool,
     cache: &ProtofetchGitCache,

@@ -6,7 +6,7 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 use thiserror::Error;
 
@@ -37,6 +37,7 @@ struct ProtoFileCanonicalMapping {
 /// proto_dir: Base path to the directory where the proto files are to be copied to
 /// cache_src_dir: Base path to the directory where the dependencies sources are cached
 /// lockfile: The lockfile that contains the dependencies to be copied
+#[instrument]
 pub fn copy_proto_files(
     proto_dir: &Path,
     cache_src_dir: &Path,

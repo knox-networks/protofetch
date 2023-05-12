@@ -20,6 +20,7 @@ pub trait RepositoryCache {
     fn clone_or_update(&self, entry: &Coordinate) -> Result<Box<dyn ProtoRepository>, CacheError>;
 }
 
+#[derive(Debug)]
 pub struct ProtofetchGitCache {
     pub location: PathBuf,
     git_auth: Option<HttpGitAuth>,
