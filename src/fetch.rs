@@ -14,7 +14,7 @@ use crate::{
 };
 use std::iter::FromIterator;
 use thiserror::Error;
-
+use tracing::{debug, error, info};
 
 #[derive(Error, Debug)]
 pub enum FetchError {
@@ -62,7 +62,7 @@ pub fn lock<Cache: RepositoryCache>(
         parent: Option<&DependencyName>,
     ) -> Result<(), FetchError> {
         for dependency in dependencies {
-            log::info!("Resolving {:?}", dependency.coordinate);
+            tracing::info!("Resolving {:?}", dependency.coordinate);
 
             dep_map
                 .entry(dependency.name.clone())
@@ -185,7 +185,7 @@ fn resolve_conflicts(
                 0 => None,
                 1 => Some((k, v.remove(0))),
                 _ => {
-                    log::warn!(
+                    tracing::warn!(
                         "discarded {} dependencies while resolving conflicts for {:?}",
                         len - 1,
                         k
@@ -202,7 +202,7 @@ fn locked_dependencies(
 ) -> Result<BTreeSet<LockedDependency>, FetchError> {
     let mut locked_deps: BTreeSet<LockedDependency> = BTreeSet::new();
     for (name, (rules, coordinate, repository, revision, deps)) in dep_map {
-        log::info!("Locking {:?} at {:?}", coordinate, revision);
+        tracing::info!("Locking {:?} at {:?}", coordinate, revision);
 
         let commit_hash = repository.resolve_commit_hash(revision, coordinate.branch.clone())?;
         let locked_dep = LockedDependency {
@@ -221,9 +221,8 @@ fn locked_dependencies(
 #[test]
 fn lock_from_descriptor_always_the_same() {
     use crate::{
-        cache::MockRepositoryCache, model::protofetch::Protocol,
+        cache::MockRepositoryCache, model::protofetch::Protocol, model::protofetch::*,
         proto_repository::MockProtoRepository,
-        model::protofetch::*,
     };
     let mut mock_repo_cache = MockRepositoryCache::new();
     let desc = Descriptor {
@@ -257,8 +256,8 @@ fn lock_from_descriptor_always_the_same() {
                 revision: Revision::Arbitrary {
                     revision: "2.0.0".to_string(),
                 },
-                rules : Rules {
-                    prune : true,
+                rules: Rules {
+                    prune: true,
                     content_roots: BTreeSet::from([ContentRoot::from_string("src")]),
                     transitive: false,
                     allow_policies: AllowPolicies::new(BTreeSet::from([
@@ -328,19 +327,25 @@ fn remove_duplicates() {
     let mut input: HashMap<DependencyName, Vec<Revision>> = HashMap::new();
     let mut result: HashMap<DependencyName, Revision> = HashMap::new();
     let name = DependencyName::new("foo".to_string());
-    input.insert(name.clone(), vec![
-        Revision::Arbitrary {
-            revision: "1.0.0".to_string(),
-        },
+    input.insert(
+        name.clone(),
+        vec![
+            Revision::Arbitrary {
+                revision: "1.0.0".to_string(),
+            },
+            Revision::Arbitrary {
+                revision: "3.0.0".to_string(),
+            },
+            Revision::Arbitrary {
+                revision: "2.0.0".to_string(),
+            },
+        ],
+    );
+    result.insert(
+        name,
         Revision::Arbitrary {
             revision: "3.0.0".to_string(),
         },
-        Revision::Arbitrary {
-            revision: "2.0.0".to_string(),
-        },
-    ]);
-    result.insert(name, Revision::Arbitrary {
-        revision: "3.0.0".to_string(),
-    });
+    );
     assert_eq!(resolve_conflicts(input), result)
 }

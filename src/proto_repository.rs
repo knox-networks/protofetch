@@ -2,12 +2,14 @@ use std::{
     path::{Path, PathBuf},
     str::Utf8Error,
 };
+use tracing::{debug, error, info, warn};
 
 use crate::model::protofetch::{DependencyName, Descriptor, Revision};
 use git2::{Repository, ResetType};
 use thiserror::Error;
 
-#[cfg(test)] use mockall::{predicate::*, *};
+#[cfg(test)]
+use mockall::{predicate::*, *};
 
 #[derive(Error, Debug)]
 pub enum ProtoRepoError {
@@ -90,7 +92,9 @@ impl ProtoRepository for ProtoGitRepository {
 
         match result {
             Err(e) if e.code() == git2::ErrorCode::NotFound => {
-                log::debug!("Couldn't find protofetch.toml, assuming module has no dependencies");
+                tracing::debug!(
+                    "Couldn't find protofetch.toml, assuming module has no dependencies"
+                );
                 Ok(Descriptor {
                     name: dep_name.value.clone(),
                     description: None,
@@ -167,7 +171,7 @@ impl ProtoRepository for ProtoGitRepository {
                         wanted_path: worktree_path.to_str().unwrap_or("").to_string(),
                     });
                 } else {
-                    log::info!(
+                    tracing::info!(
                         "Module[{}] Found existing worktree for dep {:?} at {}.",
                         module_name,
                         dep_name,
@@ -176,7 +180,7 @@ impl ProtoRepository for ProtoGitRepository {
                 }
             }
             Err(_) => {
-                log::info!(
+                tracing::info!(
                     "Module[{}] Creating new worktree for dep {:?} at {}.",
                     module_name,
                     dep_name,

@@ -10,12 +10,9 @@ use std::{
 
 use crate::model::ParseError;
 use lazy_static::lazy_static;
-use log::debug;
-use std::{
-    collections::BTreeSet,
-    hash::Hash,
-};
+use std::{collections::BTreeSet, hash::Hash};
 use toml::{map::Map, Value};
+use tracing::{debug, error};
 
 #[derive(
     new, SmartDefault, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Ord, PartialOrd,
@@ -234,7 +231,7 @@ impl Default for AllowPolicies {
 }
 
 impl AllowPolicies {
-    pub fn is_empty(allow_policies:&Self) -> bool {
+    pub fn is_empty(allow_policies: &Self) -> bool {
         allow_policies.policies.is_empty()
     }
 
@@ -257,7 +254,7 @@ pub struct DenyPolicies {
 }
 
 impl DenyPolicies {
-    pub fn is_empty(deny_policies:&Self) -> bool {
+    pub fn is_empty(deny_policies: &Self) -> bool {
         deny_policies.policies.is_empty()
     }
 

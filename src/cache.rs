@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use git2::{build::RepoBuilder, Cred, FetchOptions, RemoteCallbacks, Repository};
 use thiserror::Error;
+use tracing::{trace, warn};
 
 use crate::{
     cache::CacheError::AuthFailure,
@@ -11,7 +12,8 @@ use crate::{
 };
 
 use crate::proto_repository::ProtoRepository;
-#[cfg(test)] use mockall::{predicate::*, *};
+#[cfg(test)]
+use mockall::{predicate::*, *};
 
 #[cfg_attr(test, automock)]
 pub trait RepositoryCache {

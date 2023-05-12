@@ -6,6 +6,7 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
+use tracing::{debug, error, info, trace};
 
 use thiserror::Error;
 
@@ -46,7 +47,10 @@ pub fn copy_proto_files(
         lockfile.module_name
     );
     if !proto_dir.exists() {
-        std::fs::create_dir_all(proto_dir)?;
+        std::fs::create_dir_all(proto_dir).map_err(|e| {
+            error!(?proto_dir);
+            e
+        })?;
     }
 
     let deps = collect_all_root_dependencies(lockfile);
@@ -154,13 +158,7 @@ fn pruned_transitive_dependencies(
                     visited,
                     found_proto_deps,
                 )?;
-                inner_loop(
-                    cache_src_dir,
-                    dep,
-                    lockfile,
-                    visited,
-                    found_proto_deps,
-                )?;
+                inner_loop(cache_src_dir, dep, lockfile, visited, found_proto_deps)?;
             }
         }
         Ok(())
@@ -439,7 +437,7 @@ mod test {
         collections::{BTreeSet, HashSet},
         path::{Path, PathBuf},
     };
-    use test_log::test;
+    use test_tracing::test;
 
     #[test]
     fn content_root_dependencies_test() {
@@ -700,7 +698,7 @@ mod test {
     }
 
     #[test]
-    fn generate_valid_lock_no_dep(){
+    fn generate_valid_lock_no_dep() {
         let expected = r#"module_name = 'test'
 
 [[dependencies]]
@@ -722,15 +720,13 @@ transitive = false
         let lock_file = LockFile {
             module_name: "test".to_string(),
             proto_out_dir: None,
-            dependencies: BTreeSet::from([
-                LockedDependency {
-                    name: DependencyName::new("dep2".to_string()),
-                    commit_hash: "hash2".to_string(),
-                    coordinate: Coordinate::default(),
-                    dependencies: BTreeSet::new(),
-                    rules: Rules::default(),
-                },
-            ]),
+            dependencies: BTreeSet::from([LockedDependency {
+                name: DependencyName::new("dep2".to_string()),
+                commit_hash: "hash2".to_string(),
+                coordinate: Coordinate::default(),
+                dependencies: BTreeSet::new(),
+                rules: Rules::default(),
+            }]),
         };
         let value_toml = toml::Value::try_from(lock_file).unwrap();
         let string_fmt = toml::to_string_pretty(&value_toml).unwrap();
@@ -738,19 +734,17 @@ transitive = false
     }
 
     #[test]
-    fn parse_valid_lock_no_dep(){
+    fn parse_valid_lock_no_dep() {
         let lock_file = LockFile {
             module_name: "test".to_string(),
             proto_out_dir: None,
-            dependencies: BTreeSet::from([
-                LockedDependency {
-                    name: DependencyName::new("dep2".to_string()),
-                    commit_hash: "hash2".to_string(),
-                    coordinate: Coordinate::default(),
-                    dependencies: BTreeSet::new(),
-                    rules: Rules::default(),
-                },
-            ]),
+            dependencies: BTreeSet::from([LockedDependency {
+                name: DependencyName::new("dep2".to_string()),
+                commit_hash: "hash2".to_string(),
+                coordinate: Coordinate::default(),
+                dependencies: BTreeSet::new(),
+                rules: Rules::default(),
+            }]),
         };
         let value_toml = toml::Value::try_from(&lock_file).unwrap();
         let string_fmt = toml::to_string_pretty(&value_toml).unwrap();
