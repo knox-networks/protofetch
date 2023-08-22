@@ -1,14 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use git2::{build::RepoBuilder, Cred, FetchOptions, RemoteCallbacks, Repository};
+use git2::Config;
+use git2::{build::RepoBuilder, Cred, CredentialType, FetchOptions, RemoteCallbacks, Repository};
 use thiserror::Error;
 use tracing::{trace, warn};
 
 use crate::{
-    cache::CacheError::AuthFailure,
-    cli::HttpGitAuth,
-    model::protofetch::{Coordinate, Protocol},
-    proto_repository::ProtoGitRepository,
+    cli::HttpGitAuth, model::protofetch::Coordinate, proto_repository::ProtoGitRepository,
 };
 
 use crate::proto_repository::ProtoRepository;
@@ -20,10 +18,19 @@ pub trait RepositoryCache {
     fn clone_or_update(&self, entry: &Coordinate) -> Result<Box<dyn ProtoRepository>, CacheError>;
 }
 
-#[derive(Debug)]
 pub struct ProtofetchGitCache {
     pub location: PathBuf,
+    git_config: Config,
     git_auth: Option<HttpGitAuth>,
+}
+
+impl std::fmt::Debug for ProtofetchGitCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProtofetchGitCache")
+            .field("location", &self.location)
+            .field("git_auth", &self.git_auth)
+            .finish()
+    }
 }
 
 #[derive(Error, Debug)]
@@ -32,8 +39,6 @@ pub enum CacheError {
     Git(#[from] git2::Error),
     #[error("Cache location {location} does not exist")]
     BadLocation { location: String },
-    #[error("Attempted to fetch repo to cache using https but no git auth was provided.")]
-    AuthFailure,
     #[error("IO error: {0}")]
     IO(#[from] std::io::Error),
 }
@@ -45,7 +50,7 @@ impl RepositoryCache for ProtofetchGitCache {
             Some(path) => {
                 let mut repo = self.open_entry(&path)?;
 
-                self.fetch(&entry.protocol, &mut repo)?;
+                self.fetch(&mut repo)?;
 
                 repo
             }
@@ -58,13 +63,22 @@ impl RepositoryCache for ProtofetchGitCache {
 impl ProtofetchGitCache {
     pub fn new(
         location: PathBuf,
+        git_config: Config,
         git_auth: Option<HttpGitAuth>,
     ) -> Result<ProtofetchGitCache, CacheError> {
         if location.exists() && location.is_dir() {
-            Ok(ProtofetchGitCache { location, git_auth })
+            Ok(ProtofetchGitCache {
+                location,
+                git_config,
+                git_auth,
+            })
         } else if !location.exists() {
             std::fs::create_dir_all(&location)?;
-            Ok(ProtofetchGitCache { location, git_auth })
+            Ok(ProtofetchGitCache {
+                location,
+                git_config,
+                git_auth,
+            })
         } else {
             Err(CacheError::BadLocation {
                 location: location.to_str().unwrap_or("").to_string(),
@@ -88,77 +102,60 @@ impl ProtofetchGitCache {
     }
 
     fn clone_repo(&self, entry: &Coordinate) -> Result<Repository, CacheError> {
-        fn clone_repo_inner(
-            location: &Path,
-            entry: &Coordinate,
-            branch: &str,
-            auth: Option<HttpGitAuth>,
-        ) -> Result<Repository, CacheError> {
-            let mut repo_builder = RepoBuilder::new();
-            let options = ProtofetchGitCache::fetch_options(&entry.protocol, auth)?;
-            repo_builder
-                .bare(true)
-                .fetch_options(options)
-                .branch(branch);
+        let mut repo_builder = RepoBuilder::new();
+        let options = ProtofetchGitCache::fetch_options(&self.git_config, &self.git_auth)?;
+        repo_builder.bare(true).fetch_options(options);
 
-            let url = entry.url();
-            trace!("Cloning repo {}", url);
-            repo_builder
-                .clone(&url, location.join(entry.as_path()).as_path())
-                .map_err(|e| e.into())
-        }
-        let branch = entry.branch.as_deref().unwrap_or("master");
-        //Try to clone repo from master, otherwise try main
-        //TODO: decide whether we actually want to actively choose the repo to checkout
-        clone_repo_inner(&self.location, entry, branch, self.git_auth.clone()).or_else(|_err| {
-            warn!(
-                "Could not clone repo for branch {} with error {:?}, attempting to clone main",
-                branch, _err
-            );
-            clone_repo_inner(&self.location, entry, "main", self.git_auth.clone())
-        })
+        let url = entry.url();
+        trace!("Cloning repo {}", url);
+        repo_builder
+            .clone(&url, self.location.join(entry.as_path()).as_path())
+            .map_err(|e| e.into())
     }
 
-    fn fetch(&self, protocol: &Protocol, repo: &mut Repository) -> Result<(), CacheError> {
+    fn fetch(&self, repo: &mut Repository) -> Result<(), CacheError> {
         let mut remote = repo.find_remote("origin")?;
         let refspecs: Vec<String> = remote
             .refspecs()
             .filter_map(|refspec| refspec.str().map(|s| s.to_string()))
             .collect();
-        let options = &mut ProtofetchGitCache::fetch_options(protocol, self.git_auth.clone())?;
+        let options = &mut ProtofetchGitCache::fetch_options(&self.git_config, &self.git_auth)?;
         remote.fetch(&refspecs, Some(options), None)?;
 
         Ok(())
     }
 
-    fn fetch_options(
-        protocol: &Protocol,
-        auth: Option<HttpGitAuth>,
-    ) -> Result<FetchOptions, CacheError> {
+    fn fetch_options<'a>(
+        config: &'a Config,
+        auth: &'a Option<HttpGitAuth>,
+    ) -> Result<FetchOptions<'a>, CacheError> {
         let mut callbacks = RemoteCallbacks::new();
-        match protocol {
-            Protocol::Ssh => {
-                trace!("Adding ssh callback for git fetch");
-                let callbacks = callbacks.credentials(|_url, username, _allowed_types| {
-                    Cred::ssh_key_from_agent(username.unwrap_or("git"))
-                });
-                Ok(callbacks)
+        // Consider using https://crates.io/crates/git2_credentials that supports
+        // more authentication options
+        callbacks.credentials(move |url, username, allowed_types| {
+            trace!(
+                "Requested credentials for {}, username {:?}, allowed types {:?}",
+                url,
+                username,
+                allowed_types
+            );
+            // Asking for ssh username
+            if allowed_types.contains(CredentialType::USERNAME) {
+                return Cred::username("git");
             }
-            Protocol::Https => match auth {
-                Some(auth) => {
-                    trace!(
-                        "Adding https callback with auth user {} for git fetch",
-                        auth.username
-                    );
-                    let callbacks =
-                        callbacks.credentials(move |_url, _username, _allowed_types| {
-                            Cred::userpass_plaintext(&auth.username, &auth.password)
-                        });
-                    Ok(callbacks)
+            // SSH auth
+            if allowed_types.contains(CredentialType::SSH_KEY) {
+                return Cred::ssh_key_from_agent(username.unwrap_or("git"));
+            }
+            // HTTP auth
+            if allowed_types.contains(CredentialType::USER_PASS_PLAINTEXT) {
+                if let Some(auth) = auth {
+                    return Cred::userpass_plaintext(&auth.username, &auth.password);
                 }
-                None => Err(AuthFailure),
-            },
-        }?;
+                return Cred::credential_helper(config, url, username);
+            }
+            Err(git2::Error::from_str("no valid authentication available"))
+        });
 
         let mut fetch_options = FetchOptions::new();
         fetch_options

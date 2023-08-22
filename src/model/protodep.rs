@@ -1,7 +1,7 @@
 use crate::model::{
     protofetch::{
         Coordinate, Dependency as ProtofetchDependency, DependencyName, Descriptor, Protocol,
-        Revision, Rules,
+        Revision, RevisionSpecification, Rules,
     },
     ParseError,
 };
@@ -68,18 +68,19 @@ impl ProtodepDescriptor {
         })
     }
 
-    pub fn to_proto_fetch(self) -> Result<Descriptor, ParseError> {
+    pub fn into_proto_fetch(self) -> Result<Descriptor, ParseError> {
         fn convert_dependency(d: Dependency) -> Result<ProtofetchDependency, ParseError> {
             let protocol: Protocol = Protocol::from_str(&d.protocol)?;
-            let coordinate = Coordinate::from_url(d.target.as_str(), protocol, d.branch)?;
-            let revision = Revision::Arbitrary {
-                revision: d.revision,
+            let coordinate = Coordinate::from_url(d.target.as_str(), protocol)?;
+            let specification = RevisionSpecification {
+                revision: Revision::pinned(d.revision),
+                branch: d.branch,
             };
             let name = DependencyName::new(coordinate.repository.clone());
             Ok(ProtofetchDependency {
                 name,
                 coordinate,
-                revision,
+                specification,
                 rules: Rules::default(),
             })
         }
@@ -99,9 +100,15 @@ impl ProtodepDescriptor {
     }
 }
 
-#[test]
-fn load_valid_file_one_dep() {
-    let str = r#"
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn load_valid_file_one_dep() {
+        let str = r#"
 proto_outdir = "./proto_out"
 
 [[dependencies]]
@@ -111,26 +118,26 @@ proto_outdir = "./proto_out"
   revision = "1.0.0"
 "#;
 
-    let expected = ProtodepDescriptor {
-        proto_out_dir: "./proto_out".to_string(),
-        dependencies: vec![Dependency {
-            target: "github.com/opensaasstudio/plasma/protobuf".to_string(),
-            subgroup: None,
-            branch: Some("master".to_string()),
-            revision: "1.0.0".to_string(),
-            path: None,
-            ignores: vec![],
-            includes: vec![],
-            protocol: "ssh".to_string(),
-        }],
-    };
+        let expected = ProtodepDescriptor {
+            proto_out_dir: "./proto_out".to_string(),
+            dependencies: vec![Dependency {
+                target: "github.com/opensaasstudio/plasma/protobuf".to_string(),
+                subgroup: None,
+                branch: Some("master".to_string()),
+                revision: "1.0.0".to_string(),
+                path: None,
+                ignores: vec![],
+                includes: vec![],
+                protocol: "ssh".to_string(),
+            }],
+        };
 
-    assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
-}
+        assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
+    }
 
-#[test]
-fn load_valid_file_multiple_dep() {
-    let str = r#"
+    #[test]
+    fn load_valid_file_multiple_dep() {
+        let str = r#"
 proto_outdir = "./proto_out"
 
 [[dependencies]]
@@ -151,59 +158,59 @@ proto_outdir = "./proto_out"
   revision = "3.0.0"
 "#;
 
-    let expected = ProtodepDescriptor {
-        proto_out_dir: "./proto_out".to_string(),
-        dependencies: vec![
-            Dependency {
-                target: "github.com/opensaasstudio/plasma/protobuf".to_string(),
-                subgroup: None,
-                branch: Some("master".to_string()),
-                revision: "1.0.0".to_string(),
-                path: None,
-                ignores: vec![],
-                includes: vec![],
-                protocol: "ssh".to_string(),
-            },
-            Dependency {
-                target: "github.com/opensaasstudio/plasma1/protobuf".to_string(),
-                subgroup: None,
-                branch: Some("master".to_string()),
-                revision: "2.0.0".to_string(),
-                path: None,
-                ignores: vec![],
-                includes: vec![],
-                protocol: "https".to_string(),
-            },
-            Dependency {
-                target: "github.com/opensaasstudio/plasma2/protobuf".to_string(),
-                subgroup: None,
-                branch: None,
-                revision: "3.0.0".to_string(),
-                path: None,
-                ignores: vec![],
-                includes: vec![],
-                protocol: "ssh".to_string(),
-            },
-        ],
-    };
+        let expected = ProtodepDescriptor {
+            proto_out_dir: "./proto_out".to_string(),
+            dependencies: vec![
+                Dependency {
+                    target: "github.com/opensaasstudio/plasma/protobuf".to_string(),
+                    subgroup: None,
+                    branch: Some("master".to_string()),
+                    revision: "1.0.0".to_string(),
+                    path: None,
+                    ignores: vec![],
+                    includes: vec![],
+                    protocol: "ssh".to_string(),
+                },
+                Dependency {
+                    target: "github.com/opensaasstudio/plasma1/protobuf".to_string(),
+                    subgroup: None,
+                    branch: Some("master".to_string()),
+                    revision: "2.0.0".to_string(),
+                    path: None,
+                    ignores: vec![],
+                    includes: vec![],
+                    protocol: "https".to_string(),
+                },
+                Dependency {
+                    target: "github.com/opensaasstudio/plasma2/protobuf".to_string(),
+                    subgroup: None,
+                    branch: None,
+                    revision: "3.0.0".to_string(),
+                    path: None,
+                    ignores: vec![],
+                    includes: vec![],
+                    protocol: "ssh".to_string(),
+                },
+            ],
+        };
 
-    assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
-}
+        assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
+    }
 
-#[test]
-fn load_valid_file_no_dep() {
-    let str = r#"proto_outdir = "./proto_out""#;
-    let expected = ProtodepDescriptor {
-        proto_out_dir: "./proto_out".to_string(),
-        dependencies: vec![],
-    };
+    #[test]
+    fn load_valid_file_no_dep() {
+        let str = r#"proto_outdir = "./proto_out""#;
+        let expected = ProtodepDescriptor {
+            proto_out_dir: "./proto_out".to_string(),
+            dependencies: vec![],
+        };
 
-    assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
-}
+        assert_eq!(ProtodepDescriptor::from_toml_str(str).unwrap(), expected);
+    }
 
-#[test]
-fn migrate_protodep_to_protofetch_file() {
-    let protodep_toml = r#"
+    #[test]
+    fn migrate_protodep_to_protofetch_file() {
+        let protodep_toml = r#"
 proto_outdir = "./proto_out"
 
 [[dependencies]]
@@ -213,22 +220,24 @@ proto_outdir = "./proto_out"
   revision = "1.5.0"
 "#;
 
-    let protofetch_toml = r#"
+        let protofetch_toml = r#"
 name = "generated"
 description = "Generated from protodep file"
 proto_out_dir = "./proto_out"
 [plasma]
   url="github.com/opensaasstudio/plasma"
   protocol = "ssh"
+  branch = "master"
   revision = "1.5.0"
 "#;
-    let descriptor = ProtodepDescriptor::from_toml_str(protodep_toml)
-        .unwrap()
-        .to_proto_fetch()
-        .unwrap();
-    let toml = toml::to_string(&descriptor.to_toml()).unwrap();
+        let descriptor = ProtodepDescriptor::from_toml_str(protodep_toml)
+            .unwrap()
+            .into_proto_fetch()
+            .unwrap();
+        let toml = toml::to_string(&descriptor.into_toml()).unwrap();
 
-    let expected = Descriptor::from_toml_str(protofetch_toml).unwrap();
-    let result = Descriptor::from_toml_str(&toml).unwrap();
-    assert_eq!(result, expected);
+        let expected = Descriptor::from_toml_str(protofetch_toml).unwrap();
+        let result = Descriptor::from_toml_str(&toml).unwrap();
+        assert_eq!(result, expected);
+    }
 }
