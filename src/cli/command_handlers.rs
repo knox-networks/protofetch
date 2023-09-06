@@ -10,6 +10,7 @@ use crate::{
     proto,
 };
 use std::{
+    collections::BTreeMap,
     error::Error,
     path::{Path, PathBuf},
 };
@@ -25,7 +26,12 @@ pub fn do_fetch(
     lock_file_name: &Path,
     cache_dependencies_directory_name: &Path,
     output_directory_name: Option<&Path>,
+    source_overrides: Vec<(String, String)>,
 ) -> Result<(), Box<dyn Error>> {
+    for (name, path) in source_overrides.iter() {
+        println!("Source: {name}={path}");
+    }
+
     let lock_file_path = root.join(lock_file_name);
     let lockfile = if force_lock || !lock_file_path.exists() {
         do_lock(cache, root, module_file_name, lock_file_name)?
@@ -37,7 +43,19 @@ pub fn do_fetch(
         .or_else(|| lockfile.proto_out_dir.as_ref().map(Path::new))
         .unwrap_or(Path::new(DEFAULT_OUTPUT_DIRECTORY_NAME));
     let output_directory_path = root.join(output_directory_name);
-    fetch::fetch_sources(cache, &lockfile, &cache_dependencies_directory_path)?;
+
+    let override_map: BTreeMap<&str, &str> = source_overrides
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect();
+
+    fetch::fetch_sources(
+        cache,
+        &lockfile,
+        &cache_dependencies_directory_path,
+        &override_map,
+    )?;
+
     //Copy proto_out files to actual target
     proto::copy_proto_files(
         &output_directory_path,

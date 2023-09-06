@@ -32,7 +32,11 @@ impl Protofetch {
     }
 
     /// Fetches dependencies defined in the toml configuration file
-    pub fn fetch(&self, ignore_lock_file: bool) -> Result<(), Box<dyn Error>> {
+    pub fn fetch(
+        &self,
+        ignore_lock_file: bool,
+        source_overrides: Vec<(String, String)>,
+    ) -> Result<(), Box<dyn Error>> {
         do_fetch(
             ignore_lock_file,
             &self.cache,
@@ -41,6 +45,7 @@ impl Protofetch {
             &self.lock_file_name,
             &self.cache_dependencies_directory_name,
             self.output_directory_name.as_deref(),
+            source_overrides,
         )
     }
 

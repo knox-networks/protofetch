@@ -65,7 +65,7 @@ pub fn lock<Cache: RepositoryCache>(
                 dependency.specification.clone(),
             ));
 
-            let repo = cache.clone_or_update(&dependency.coordinate)?;
+            let repo = cache.clone_or_update(&dependency.coordinate, None)?;
             let descriptor =
                 repo.extract_descriptor(&dependency.name, &dependency.specification)?;
 
@@ -130,6 +130,7 @@ pub fn fetch_sources<Cache: RepositoryCache>(
     cache: &Cache,
     lockfile: &LockFile,
     cache_src_dir: &Path,
+    override_map: &BTreeMap<&str, &str>,
 ) -> Result<(), FetchError> {
     info!("Fetching dependencies source files...");
 
@@ -148,7 +149,20 @@ pub fn fetch_sources<Cache: RepositoryCache>(
                 debug!("Skipping fetching {:?}. Already in cache", dep.name);
                 continue;
             }
-            let repo = cache.clone_or_update(&dep.coordinate)?;
+
+            let path_override = if override_map.contains_key(dep.name.value.as_str()) {
+                let path_str = override_map[dep.name.value.as_str()];
+                debug!(
+                    "Skipping fetching {:?} because it is overridden with a local source: {path_str}",
+                    dep.name
+                );
+                let path = PathBuf::from(path_str);
+                Some(path)
+            } else {
+                None
+            };
+
+            let repo = cache.clone_or_update(&dep.coordinate, path_override)?;
             let work_tree_res = repo.create_worktrees(
                 &lockfile.module_name,
                 &dep.name,
@@ -366,7 +380,7 @@ mod tests {
             ],
         };
 
-        mock_repo_cache.expect_clone_or_update().returning(|_| {
+        mock_repo_cache.expect_clone_or_update().returning(|_, _| {
             let mut mock_repo = MockProtoRepository::new();
             mock_repo.expect_extract_descriptor().returning(
                 |dep_name: &DependencyName, _: &RevisionSpecification| {
