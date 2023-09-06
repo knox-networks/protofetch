@@ -33,6 +33,15 @@ pub struct CliArgs {
     pub password: Option<String>,
 }
 
+fn parse_key_val(s: &str) -> Result<(String, String), String>
+where
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    Ok((s[..pos].into(), s[pos + 1..].into()))
+}
+
 #[derive(Debug, Parser)]
 pub enum Command {
     /// Fetches protodep dependencies defined in the toml configuration file
@@ -44,6 +53,11 @@ pub enum Command {
         /// this is a relative path within cache folder
         #[clap(short, long, hide(true))]
         repo_output_directory: Option<String>,
+
+        #[clap(short, long, value_parser = parse_key_val, value_name="REPO=FILE_PATH")]
+        /// Optionallly override the location of this registry with a local path to a git
+        /// repository
+        source_overrides: Vec<(String, String)>,
     },
     /// Creates a lock file based on toml configuration file
     Lock,
@@ -106,6 +120,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Command::Fetch {
             force_lock,
             repo_output_directory,
+            source_overrides,
         } => {
             #[allow(deprecated)]
             if let Some(repo_output_directory) = repo_output_directory {
@@ -113,7 +128,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 protofetch = protofetch.cache_dependencies_directory_name(repo_output_directory);
             }
 
-            protofetch.try_build()?.fetch(force_lock)
+            protofetch.try_build()?.fetch(force_lock, source_overrides)
         }
         Command::Lock => protofetch.try_build()?.lock(),
         Command::Init { directory, name } => protofetch.root(directory).try_build()?.init(name),

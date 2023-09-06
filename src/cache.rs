@@ -15,7 +15,11 @@ use mockall::{predicate::*, *};
 
 #[cfg_attr(test, automock)]
 pub trait RepositoryCache {
-    fn clone_or_update(&self, entry: &Coordinate) -> Result<Box<dyn ProtoRepository>, CacheError>;
+    fn clone_or_update(
+        &self,
+        entry: &Coordinate,
+        path_override: Option<PathBuf>,
+    ) -> Result<Box<dyn ProtoRepository>, CacheError>;
 }
 
 pub struct ProtofetchGitCache {
@@ -35,9 +39,13 @@ pub enum CacheError {
 }
 
 impl RepositoryCache for ProtofetchGitCache {
-    fn clone_or_update(&self, entry: &Coordinate) -> Result<Box<dyn ProtoRepository>, CacheError> {
+    fn clone_or_update(
+        &self,
+        entry: &Coordinate,
+        path_override: Option<PathBuf>,
+    ) -> Result<Box<dyn ProtoRepository>, CacheError> {
         let repo = match self.get_entry(entry) {
-            None => self.clone_repo(entry)?,
+            None => self.clone_repo(entry, path_override)?,
             Some(path) => {
                 let mut repo = self.open_entry(&path)?;
 
@@ -92,13 +100,29 @@ impl ProtofetchGitCache {
         Repository::open(path).map_err(|e| e.into())
     }
 
-    fn clone_repo(&self, entry: &Coordinate) -> Result<Repository, CacheError> {
+    fn clone_repo(
+        &self,
+        entry: &Coordinate,
+        path_override: Option<PathBuf>,
+    ) -> Result<Repository, CacheError> {
         let mut repo_builder = RepoBuilder::new();
-        let options = ProtofetchGitCache::fetch_options(&self.git_config, &self.git_auth)?;
-        repo_builder.bare(true).fetch_options(options);
-
-        let url = entry.url();
-        trace!("Cloning repo {}", url);
+        repo_builder.bare(true);
+        let url = match path_override {
+            Some(path_override) => {
+                trace!(
+                    "Cloning locally-overridden repo {}",
+                    path_override.display()
+                );
+                path_override.display().to_string()
+            }
+            None => {
+                let options = ProtofetchGitCache::fetch_options(&self.git_config, &self.git_auth)?;
+                repo_builder.fetch_options(options);
+                let url = entry.url();
+                trace!("Cloning repo {}", url);
+                url
+            }
+        };
         repo_builder
             .clone(&url, self.location.join(entry.as_path()).as_path())
             .map_err(|e| e.into())
