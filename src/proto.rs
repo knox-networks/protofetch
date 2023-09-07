@@ -246,14 +246,23 @@ fn copy_proto_sources_for_dep(
         );
         let proto_file_source = dep_cache_dir.join(&mapping.from);
         let proto_file_out = proto_dir.join(&mapping.to);
+        debug!("Proto file out: {}", proto_file_out.display());
         let prefix = proto_file_out.parent().ok_or_else(|| {
             ProtoError::BadPath(format!(
                 "Bad parent dest file for {}",
                 &proto_file_out.to_string_lossy()
             ))
         })?;
-        std::fs::create_dir_all(prefix)?;
-        std::fs::copy(proto_file_source, proto_file_out.as_path())?;
+        debug!("Path prefix: {}", prefix.display());
+        std::fs::create_dir_all(prefix).map_err(|e| {
+            debug!("{e}");
+            e
+        })?;
+        debug!("proto_file_source: {}", proto_file_source.display());
+        std::fs::copy(proto_file_source, proto_file_out.as_path()).map_err(|e| {
+            debug!("{e}");
+            e
+        })?;
     }
     Ok(())
 }
