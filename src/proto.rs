@@ -253,7 +253,10 @@ fn copy_proto_sources_for_dep(
             ))
         })?;
         std::fs::create_dir_all(prefix)?;
-        std::fs::copy(proto_file_source, proto_file_out.as_path())?;
+        use std::io::Write;
+        let proto_file_source_contents = std::fs::read_to_string(&proto_file_source)?;
+        let mut file = File::create(proto_file_out.as_path())?;
+        file.write_all(proto_file_source_contents.as_bytes())?;
     }
     Ok(())
 }
