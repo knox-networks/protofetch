@@ -260,21 +260,24 @@ fn copy_proto_sources_for_dep(
         })?;
         debug!("proto_file_source: {}", proto_file_source.display());
 
-        let mut file = std::fs::File::create(prefix.join("yolo.txt")).unwrap();
         use std::io::Write;
-        file.write(b"Some arbitrary text").unwrap();
 
-        debug!("just wrote a file there!");
-
-        let contents = std::fs::read_to_string(&proto_file_source)
+        let proto_file_source_contents = std::fs::read_to_string(&proto_file_source)
             .expect("Should have been able to read the file");
-        println!("CONTENTS len {}", contents.len());
+        println!("proto_file_soruce len {}", proto_file_source_contents.len());
+
+        let mut file = File::create(proto_file_out.as_path())?;
+        file.write_all(proto_file_source_contents.as_bytes())
+            .unwrap();
+
         //std::fs::copy(&proto_file_source, PathBuf::from("/tmp/some_test_file")).unwrap();
 
+        /*
         std::fs::copy(proto_file_source, proto_file_out.as_path()).map_err(|e| {
             debug!("{e}");
             e
         })?;
+        */
     }
     Ok(())
 }
