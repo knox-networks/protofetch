@@ -259,6 +259,15 @@ fn copy_proto_sources_for_dep(
             e
         })?;
         debug!("proto_file_source: {}", proto_file_source.display());
+
+        let mut file = std::fs::File::create(prefix.join("yolo.txt")).unwrap();
+        use std::io::Write;
+        file.write(b"Some arbitrary text").unwrap();
+
+        debug!("just wrote a file there!");
+
+        std::fs::copy(&proto_file_source, PathBuf::from("/tmp/some_test_file")).unwrap();
+
         std::fs::copy(proto_file_source, proto_file_out.as_path()).map_err(|e| {
             debug!("{e}");
             e
