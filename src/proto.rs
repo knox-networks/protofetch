@@ -266,7 +266,10 @@ fn copy_proto_sources_for_dep(
 
         debug!("just wrote a file there!");
 
-        std::fs::copy(&proto_file_source, PathBuf::from("/tmp/some_test_file")).unwrap();
+        let contents = std::fs::read_to_string(&proto_file_source)
+            .expect("Should have been able to read the file");
+        println!("CONTENTS len {}", contents.len());
+        //std::fs::copy(&proto_file_source, PathBuf::from("/tmp/some_test_file")).unwrap();
 
         std::fs::copy(proto_file_source, proto_file_out.as_path()).map_err(|e| {
             debug!("{e}");
