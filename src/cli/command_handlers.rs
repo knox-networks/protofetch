@@ -61,6 +61,7 @@ pub fn do_fetch(
         &output_directory_path,
         &cache_dependencies_directory_path,
         &lockfile,
+        &override_map,
     )?;
     Ok(())
 }

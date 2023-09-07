@@ -150,17 +150,16 @@ pub fn fetch_sources<Cache: RepositoryCache>(
                 continue;
             }
 
-            let path_override = if override_map.contains_key(dep.name.value.as_str()) {
+            if override_map.contains_key(dep.name.value.as_str()) {
                 let path_str = override_map[dep.name.value.as_str()];
                 debug!(
                     "Skipping fetching {:?} because it is overridden with a local source: {path_str}",
                     dep.name
                 );
-                let path = PathBuf::from(path_str);
-                Some(path)
-            } else {
-                None
-            };
+                continue;
+            }
+
+            let path_override = None;
 
             let repo = cache.clone_or_update(&dep.coordinate, path_override)?;
             let work_tree_res = repo.create_worktrees(

@@ -5,7 +5,7 @@ use crate::model::protofetch::{
 use derive_new::new;
 use log::{debug, info, trace};
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
@@ -44,6 +44,7 @@ pub fn copy_proto_files(
     proto_dir: &Path,
     cache_src_dir: &Path,
     lockfile: &LockFile,
+    override_map: &BTreeMap<&str, &str>,
 ) -> Result<(), ProtoError> {
     info!(
         "Copying proto files from {} descriptor...",
@@ -56,7 +57,12 @@ pub fn copy_proto_files(
     let deps = collect_all_root_dependencies(lockfile);
 
     for dep in &deps {
-        let dep_cache_dir = cache_src_dir.join(&dep.name.value).join(&dep.commit_hash);
+        let dep_cache_dir = if let Some(dir) = override_map.get(dep.name.value.as_str()) {
+            PathBuf::from(dir)
+        } else {
+            cache_src_dir.join(&dep.name.value).join(&dep.commit_hash)
+        };
+
         let sources_to_copy: HashSet<ProtoFileMapping> = if !dep.rules.prune {
             copy_all_proto_files_for_dep(&dep_cache_dir, dep)?
         } else {
