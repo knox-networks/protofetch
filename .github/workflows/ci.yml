@@ -47,14 +47,6 @@ jobs:
       - name: Run cargo test
         run: cargo test
      
-  update-release-draft:
-    runs-on: ubuntu-latest
-    if: github.repository == 'coralogix/protofetch' && github.ref == 'refs/heads/master'
-    steps:
-      - uses: release-drafter/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   package-linux:
     runs-on: ubuntu-latest
     needs: [ lint, test ]
@@ -161,4 +153,3 @@ jobs:
             protofetch_aarch64-unknown-linux-musl.tar.gz
             protofetch_x86_64-unknown-linux-musl.tar.gz
             protofetch_darwin_amd64.tar.gz
-            protofetch_windows_amd64.tar.gz
