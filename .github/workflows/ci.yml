@@ -144,26 +144,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'coralogix/protofetch' && startsWith(github.ref, 'refs/tags/')
     needs: [ package-linux, package-mac, package-windows ]
-    env:
-      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-      NPM_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Publish cargo package
-        run: cargo publish --token ${{ env.CRATES_IO_TOKEN }}
-
-      - name: Publish npm package
-        run: |
-          VERSION=$(sed -n -e '/version/ s/.* = *//p' "Cargo.toml" | head -1 | tr -d '"')
-          export VERSION
-          # Tee had issue to write to the same file which is used for read so creating a temp package.json file
-          mv .github/npm/package.json .github/npm/package.json.temp
-          sed "s/VERSION#TO#REPLACE/${VERSION}/g" .github/npm/package.json.temp |  tee .github/npm/package.json
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ".npmrc"
-          npm publish .github/npm
 
       - name: Download artifacts
         uses: actions/download-artifact@v3
