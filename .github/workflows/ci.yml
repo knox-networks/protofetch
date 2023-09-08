@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - no-remote-fetch
     tags: [ 'v*.*.*' ]
 
 name: CI
