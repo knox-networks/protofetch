@@ -4,7 +4,7 @@ on:
     branches:
       - master
       - no-remote-fetch
-    tags: [ 'v*.*.*' ]
+    tags: [ 'v*.*.*', "knox-*" ]
 
 name: CI
 
