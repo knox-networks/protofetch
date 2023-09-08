@@ -18,6 +18,7 @@ use std::{
 const DEFAULT_OUTPUT_DIRECTORY_NAME: &str = "proto_src";
 
 /// Handler to fetch command
+#[allow(clippy::too_many_arguments)]
 pub fn do_fetch(
     force_lock: bool,
     cache: &ProtofetchGitCache,
