@@ -142,7 +142,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: github.repository == 'coralogix/protofetch' && startsWith(github.ref, 'refs/tags/')
+    if: github.repository == 'knox-networks/protofetch' && startsWith(github.ref, 'refs/tags/')
     needs: [ package-linux, package-mac, package-windows ]
 
     steps:
